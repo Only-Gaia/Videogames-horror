@@ -32,6 +32,21 @@ button{background:var(--blood);color:#e8d9c0;border:1px solid #4a1010;padding:13
 #crosshair{position:fixed;top:50%;left:50%;width:5px;height:5px;background:rgba(201,184,150,.6);border-radius:50%;
   transform:translate(-50%,-50%);z-index:5;}
 #vignette{position:fixed;inset:0;pointer-events:none;z-index:4;box-shadow:inset 0 0 180px 60px rgba(0,0,0,.88);}
+#rotateOverlay{position:fixed;inset:0;background:#000;color:var(--text);z-index:30;display:none;
+  flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;}
+#rotateOverlay.show{display:flex;}
+#rotateIcon{font-size:52px;margin-bottom:16px;animation:spin 1.8s ease-in-out infinite;}
+@keyframes spin{0%,100%{transform:rotate(0deg);}50%{transform:rotate(90deg);}}
+#touchControls{position:fixed;inset:0;z-index:8;display:none;}
+#touchControls.show{display:block;}
+#joyBase{position:fixed;left:26px;bottom:calc(26px + env(safe-area-inset-bottom,0px));width:110px;height:110px;
+  border-radius:50%;background:rgba(201,184,150,.1);border:2px solid rgba(201,184,150,.35);}
+#joyThumb{position:absolute;left:35px;top:35px;width:40px;height:40px;border-radius:50%;
+  background:rgba(201,184,150,.4);pointer-events:none;}
+#lookZone{position:fixed;right:0;top:0;bottom:0;width:55%;}
+#torchBtn{position:fixed;right:26px;bottom:calc(26px + env(safe-area-inset-bottom,0px));width:72px;height:72px;
+  border-radius:50%;background:rgba(201,184,150,.12);border:2px solid rgba(201,184,150,.35);
+  display:flex;align-items:center;justify-content:center;font-size:28px;pointer-events:auto;}
 </style>
 </head>
 <body>
@@ -44,12 +59,31 @@ button{background:var(--blood);color:#e8d9c0;border:1px solid #4a1010;padding:13
 </div>
 <div id="toast"></div>
 
-<div class="overlay" id="startScreen">
+<div class="overlay" id="deviceScreen">
+  <h1>LA FAMIGLIA RAVENSCROFT</h1>
+  <p>Prima di iniziare, dicci come stai giocando:</p>
+  <button id="btnPC">🖥️ PC (tastiera e mouse)</button>
+  <button id="btnMobile">📱 Telefono / Tablet (touch)</button>
+</div>
+
+<div id="rotateOverlay">
+  <div id="rotateIcon">📱</div>
+  <p>Ruota il dispositivo in <strong>orizzontale</strong> per giocare.</p>
+</div>
+
+<div class="overlay hidden" id="startScreen">
   <h1>LA FAMIGLIA RAVENSCROFT</h1>
   <p>1897. La famiglia Ravenscroft scomparve senza lasciare traccia. Nessuno mise più piede in quella casa.<br><br>
   12 gennaio 1915. Il detective Elliot Crane ferma l'auto davanti al cancello arrugginito. Prende la torcia dal sedile e scende, deciso a scoprire la verità... senza sapere che è proprio lui, questa volta, a cacciarsi nei guai.</p>
-  <p style="font-size:12.5px;opacity:.7">WASD per muoverti, mouse per guardarti intorno, F per la torcia, click per iniziare. Trova 10 appunti: 5 raccontano la storia, 5 nascondono indizi sulle chiavi. Servono tutte e 5 le chiavi per aprire la porta sigillata in soffitta.</p>
+  <p id="controlsHint" style="font-size:12.5px;opacity:.7"></p>
+  <p style="font-size:12.5px;opacity:.7">Trova 10 appunti: 5 raccontano la storia, 5 nascondono indizi sulle chiavi. Servono tutte e 5 le chiavi per aprire la porta sigillata in soffitta.</p>
   <button id="btnStart">Scendi dall'auto</button>
+</div>
+
+<div id="touchControls">
+  <div id="joyBase"><div id="joyThumb"></div></div>
+  <div id="lookZone"></div>
+  <div id="torchBtn">🔦</div>
 </div>
 
 <div class="overlay hidden" id="endScreen">
@@ -218,15 +252,75 @@ function ambientScare(){
   scareTimer=700+Math.random()*1200;
 }
 
-let started=false, ended=false, doorOpen=false, graveyardEndTriggered=false;
+let started=false, ended=false, doorOpen=false, graveyardEndTriggered=false, isMobile=false;
 let yaw=0,pitch=0; const keysDown={};
-addEventListener('keydown',e=>{ keysDown[e.key.toLowerCase()]=true; if(e.key.toLowerCase()==='f'&&started){ flOn=!flOn; flashlight.intensity=flOn?2.2:0; document.getElementById('fState').textContent=flOn?'accesa':'spenta'; }});
+let joyVec={x:0,y:0}, joyId=null, lookId=null;
+
+function toggleTorch(){ flOn=!flOn; flashlight.intensity=flOn?2.2:0; document.getElementById('fState').textContent=flOn?'accesa':'spenta'; }
+
+addEventListener('keydown',e=>{ keysDown[e.key.toLowerCase()]=true; if(e.key.toLowerCase()==='f'&&started) toggleTorch(); });
 addEventListener('keyup',e=>keysDown[e.key.toLowerCase()]=false);
-cv.addEventListener('click',()=>{ if(started) cv.requestPointerLock(); });
+cv.addEventListener('click',()=>{ if(started&&!isMobile) cv.requestPointerLock(); });
 document.addEventListener('mousemove',e=>{
-  if(document.pointerLockElement!==cv) return;
+  if(isMobile||document.pointerLockElement!==cv) return;
   yaw-=e.movementX*0.0022; pitch-=e.movementY*0.0022; pitch=Math.max(-1.3,Math.min(1.3,pitch));
 });
+
+// ===== touch controls =====
+const joyBase=document.getElementById('joyBase'), joyThumb=document.getElementById('joyThumb'), lookZone=document.getElementById('lookZone');
+let joyOrigin={x:0,y:0}, lookLast={x:0,y:0};
+joyBase.addEventListener('touchstart',e=>{
+  const t=e.changedTouches[0]; joyId=t.identifier;
+  const r=joyBase.getBoundingClientRect(); joyOrigin={x:r.left+r.width/2,y:r.top+r.height/2};
+},{passive:true});
+lookZone.addEventListener('touchstart',e=>{
+  const t=e.changedTouches[0]; lookId=t.identifier; lookLast={x:t.clientX,y:t.clientY};
+},{passive:true});
+document.addEventListener('touchmove',e=>{
+  for(const t of e.changedTouches){
+    if(t.identifier===joyId){
+      let dx=t.clientX-joyOrigin.x, dy=t.clientY-joyOrigin.y;
+      const d=Math.hypot(dx,dy), max=45;
+      if(d>max){ dx=dx/d*max; dy=dy/d*max; }
+      joyThumb.style.transform='translate('+dx+'px,'+dy+'px)';
+      joyVec.x=dx/max; joyVec.y=dy/max;
+    } else if(t.identifier===lookId){
+      const dx=t.clientX-lookLast.x, dy=t.clientY-lookLast.y; lookLast={x:t.clientX,y:t.clientY};
+      yaw-=dx*0.0035; pitch-=dy*0.0035; pitch=Math.max(-1.3,Math.min(1.3,pitch));
+    }
+  }
+},{passive:true});
+document.addEventListener('touchend',e=>{
+  for(const t of e.changedTouches){
+    if(t.identifier===joyId){ joyId=null; joyVec={x:0,y:0}; joyThumb.style.transform='translate(0,0)'; }
+    if(t.identifier===lookId){ lookId=null; }
+  }
+});
+document.getElementById('torchBtn').addEventListener('touchstart',e=>{ e.preventDefault(); if(started) toggleTorch(); });
+
+function checkOrientation(){
+  const ov=document.getElementById('rotateOverlay');
+  if(isMobile && started && !ended && innerWidth<innerHeight) ov.classList.add('show');
+  else ov.classList.remove('show');
+}
+addEventListener('resize',checkOrientation);
+addEventListener('orientationchange',checkOrientation);
+
+document.getElementById('btnPC').onclick=()=>{
+  isMobile=false;
+  document.getElementById('deviceScreen').classList.add('hidden');
+  document.getElementById('startScreen').classList.remove('hidden');
+  document.getElementById('controlsHint').textContent="WASD per muoverti, mouse per guardarti intorno, F per la torcia, click per iniziare.";
+};
+document.getElementById('btnMobile').onclick=()=>{
+  isMobile=true;
+  document.getElementById('touchControls').classList.add('show');
+  document.getElementById('deviceScreen').classList.add('hidden');
+  document.getElementById('startScreen').classList.remove('hidden');
+  document.getElementById('controlsHint').textContent="Joystick a sinistra per muoverti, trascina a destra per guardarti intorno, tocca 🔦 per la torcia. Gioca in orizzontale.";
+  if(screen.orientation && screen.orientation.lock){ screen.orientation.lock('landscape').catch(()=>{}); }
+  checkOrientation();
+};
 
 function collide(nx,nz,r){
   for(const w of walls){
@@ -267,6 +361,7 @@ function animate(){
   camera.rotation.order='YXZ'; camera.rotation.y=yaw; camera.rotation.x=pitch;
 
   let mx=0,mz=0;
+  if(isMobile){ mx=joyVec.x; mz=joyVec.y; }
   if(keysDown['w']||keysDown['arrowup']) mz-=1;
   if(keysDown['s']||keysDown['arrowdown']) mz+=1;
   if(keysDown['a']||keysDown['arrowleft']) mx-=1;
@@ -324,11 +419,13 @@ document.getElementById('btnStart').onclick=()=>{
   flOn=false; flashlight.intensity=0; document.getElementById('fState').textContent='spenta';
   notes.forEach(n=>n.visible=true); keys.forEach(k=>k.visible=false);
   camera.position.set(0,1.65,0); yaw=0; pitch=0;
-  cv.requestPointerLock();
+  if(!isMobile) cv.requestPointerLock();
+  checkOrientation();
 };
 document.getElementById('btnRestart').onclick=()=>{
   document.getElementById('endScreen').classList.add('hidden');
-  document.getElementById('startScreen').classList.remove('hidden');
+  document.getElementById('deviceScreen').classList.remove('hidden');
+  document.getElementById('touchControls').classList.remove('show');
 };
 })();
 </script>
