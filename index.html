@@ -138,9 +138,19 @@ scene.add(camera);
 let flOn=false;
 
 const flickers=[];
-const floorMat=new THREE.MeshStandardMaterial({color:0x2a2018,roughness:1});
-const wallMat=new THREE.MeshStandardMaterial({color:0x1c1712,roughness:1});
-const ceilMat=new THREE.MeshStandardMaterial({color:0x0f0c09,roughness:1});
+function woodTexture(){
+  const c=document.createElement('canvas'); c.width=64;c.height=64; const g=c.getContext('2d');
+  g.fillStyle='#6b4a2e'; g.fillRect(0,0,64,64);
+  g.strokeStyle='rgba(0,0,0,0.18)';
+  for(let i=0;i<64;i+=6){ g.beginPath(); g.moveTo(0,i+Math.random()*3); g.lineTo(64,i+Math.random()*3); g.stroke(); }
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(4,3);
+  return t;
+}
+const woodTex=woodTexture();
+const floorMat=new THREE.MeshStandardMaterial({map:woodTex,color:0x9c7a52,roughness:1});
+const wallMat=new THREE.MeshStandardMaterial({map:woodTex,color:0xd8b88a,roughness:0.9});
+const stairMat=new THREE.MeshStandardMaterial({map:woodTex,color:0xc9a06a,roughness:0.85});
+const ceilMat=new THREE.MeshStandardMaterial({color:0x1c130e,roughness:1});
 const walls=[];
 function addFloorCeil(x,z,w,d,ly){
   const f=new THREE.Mesh(new THREE.BoxGeometry(w,0.2,d),floorMat); f.position.set(x,ly,z); scene.add(f);
@@ -153,6 +163,26 @@ function wallBox(x,z,w,h,d,ly,id){
 }
 function pointLight(x,z,ly,col,inten){
   const l=new THREE.PointLight(col||0xffaa55,(inten||0.9)*1.8,14); l.position.set(x,ly+2.3,z); scene.add(l); flickers.push(l);
+}
+function addStairsZ(zStart,zEnd,x1,x2,yStart,yEnd,steps){
+  const stepD=(zEnd-zStart)/steps;
+  for(let i=0;i<steps;i++){
+    const zc=zStart+stepD*i+stepD/2, topY=yStart+(yEnd-yStart)*(i+1)/steps;
+    const s=new THREE.Mesh(new THREE.BoxGeometry(x2-x1,0.25,Math.abs(stepD)+0.05),stairMat);
+    s.position.set((x1+x2)/2,topY-0.1,zc); scene.add(s);
+  }
+  const cm=new THREE.Mesh(new THREE.BoxGeometry(x2-x1,0.2,zEnd-zStart),ceilMat);
+  cm.position.set((x1+x2)/2,Math.max(yStart,yEnd)+3,(zStart+zEnd)/2); scene.add(cm);
+}
+function addStairsX(xStart,xEnd,z1,z2,yStart,yEnd,steps){
+  const stepW=(xEnd-xStart)/steps;
+  for(let i=0;i<steps;i++){
+    const xc=xStart+stepW*i+stepW/2, topY=yStart+(yEnd-yStart)*(i+1)/steps;
+    const s=new THREE.Mesh(new THREE.BoxGeometry(Math.abs(stepW)+0.05,0.25,z2-z1),stairMat);
+    s.position.set(xc,topY-0.1,(z1+z2)/2); scene.add(s);
+  }
+  const cm=new THREE.Mesh(new THREE.BoxGeometry(Math.abs(xEnd-xStart),0.2,z2-z1),ceilMat);
+  cm.position.set((xStart+xEnd)/2,Math.max(yStart,yEnd)+3,(z1+z2)/2); scene.add(cm);
 }
 const furnitureMat=new THREE.MeshStandardMaterial({color:0x3a2a1c,roughness:0.9});
 const fabricMat=new THREE.MeshStandardMaterial({color:0x5a3234,roughness:1});
@@ -178,7 +208,9 @@ pointLight(6,24,0,0xffdd99,0.7);
 addFloorCeil(-12,3,10,8,-3);
 wallBox(-8,0,0.3,3,7,-3); wallBox(-17,3,0.3,3,8,-3); wallBox(-12,-1,10,3,0.3,-3); wallBox(-12,7,10,3,0.3,-3);
 pointLight(-12,3,-3,0x5566aa,0.6);
+addStairsX(-2,-8,1,5,0,-3,8);
 wallBox(-2,29,0.3,3,6,0); wallBox(2,29,0.3,3,6,0);
+addStairsZ(26,32,-2,2,0,3,10);
 
 // ===== FIRST FLOOR (ly=3) corridor z32-48 =====
 addFloorCeil(0,40,4,16,3);
@@ -192,6 +224,7 @@ addFloorCeil(-7,45,10,6,3);
 wallBox(-2,44,0.3,3,1,3); wallBox(-12,45,0.3,3,6,3); wallBox(-7,42,10,3,0.3,3); wallBox(-7,48,10,3,0.3,3);
 pointLight(-7,45,3,0xffaa88,1);
 wallBox(-2,51,0.3,3,6,3); wallBox(2,51,0.3,3,6,3);
+addStairsZ(48,54,-2,2,3,6,10);
 
 // ===== ATTIC (ly=6) z54-62, locked door at z60 =====
 addFloorCeil(0,58,8,8,6);
@@ -211,10 +244,6 @@ for(let i=0;i<12;i++){
 }
 
 // ===== DECOR: mobili sparsi e ritratti di famiglia =====
-box(9,0.5,10,1.6,1,0.7,fabricMat); // divano salotto
-box(-9,0.9,15,1.4,1.8,0.6,furnitureMat); // madia cucina
-box(9,0.4,36,1.8,0.8,1,furnitureMat); // letto camera
-box(-9,0.7,47,0.9,1.4,0.6,furnitureMat); // scaffale bambino
 function photoTexture(){
   const cnv=document.createElement('canvas'); cnv.width=128; cnv.height=160; const g=cnv.getContext('2d');
   g.fillStyle='#e8d9c0'; g.fillRect(0,0,128,160);
@@ -278,6 +307,14 @@ keyDefs.forEach((d,i)=>{
 
 // ===== MOBILI INTERATTIVI (uno per chiave, con sportello apribile) =====
 function makeDoor(w,h){ const g=new THREE.BoxGeometry(w,h,0.06); g.translate(w/2,0,0); return new THREE.Mesh(g,furnitureMat); }
+const furn=[];
+function addOpenable(x,ly,z,bw,bh,bd,dw,dh,keyIdx,forceScare){
+  const grp=new THREE.Group(); grp.position.set(x,ly,z); scene.add(grp);
+  const body=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd),furnitureMat); body.position.y=bh/2; grp.add(body);
+  const door=makeDoor(dw,dh); door.position.set(-dw/2,bh*0.55,bd/2+0.01); grp.add(door);
+  const scare=forceScare!==undefined?forceScare:(keyIdx===undefined&&Math.random()<0.13);
+  furn.push({door,open:false,x,z,ly,keyIdx,scare,used:false});
+}
 const furnMeta=[
  {bw:1.1,bh:0.9,bd:0.8,dw:1.0,dh:0.8},
  {bw:1.3,bh:1.0,bd:1.0,dw:0.9,dh:0.75},
@@ -285,15 +322,19 @@ const furnMeta=[
  {bw:1.4,bh:0.6,bd:0.9,dw:0.5,dh:0.5},
  {bw:1.1,bh:1.8,bd:0.6,dw:0.9,dh:1.5}
 ];
-const furn=[];
-keyDefs.forEach((d,i)=>{
-  const m=furnMeta[i];
-  const grp=new THREE.Group(); grp.position.set(d.p[0],d.ly,d.p[2]-0.5); scene.add(grp);
-  const body=new THREE.Mesh(new THREE.BoxGeometry(m.bw,m.bh,m.bd),furnitureMat); body.position.y=m.bh/2; grp.add(body);
-  const door=makeDoor(m.dw,m.dh); door.position.set(-m.dw/2,m.bh/2,m.bd/2+0.01); grp.add(door);
-  furn.push({door,open:false,x:d.p[0],z:d.p[2]-0.5,ly:d.ly,keyIdx:i,scare:i===4,used:false});
-});
-function revealKeyIfReady(i){ const f=furn[i]; if(noteRead[i]&&f.open) keys[i].visible=true; }
+keyDefs.forEach((d,i)=>{ const m=furnMeta[i]; addOpenable(d.p[0],d.ly,d.p[2]-0.5,m.bw,m.bh,m.bd,m.dw,m.dh,i,i===4); });
+// mobili solo decorativi da aprire: per lo più vuoti, servono a rendere la ricerca vera
+const extraFurnDefs=[
+ [9,0,10,1.0,1.0,0.7,0.6,0.7],[10,0,7.5,1.1,0.7,0.6,0.5,0.5],[3,0,11,0.8,1.5,0.5,0.5,1.2],
+ [-10,0,15,1.0,1.5,0.6,0.6,1.2],[-4,0,19,0.9,0.9,0.6,0.5,0.6],[-11,0,19,0.9,0.6,0.5,0.5,0.5],
+ [7,0,23,0.8,0.8,0.5,0.5,0.6],[0,0,5,0.7,1.0,0.5,0.4,0.7],[0,0,20,0.7,1.0,0.5,0.4,0.7],
+ [-15,-3,2,1.0,0.8,0.9,0.6,0.5],[-9,-3,6,1.1,0.9,0.7,0.6,0.6],[-15,-3,5,0.9,0.7,0.7,0.5,0.5],
+ [10,3,39,1.0,0.6,0.5,0.5,0.5],[9,3,35,0.9,1.6,0.6,0.6,1.2],[3,3,38,0.8,0.9,0.5,0.5,0.6],
+ [-10,3,43,1.0,0.9,0.6,0.6,0.6],[-4,3,47,0.8,1.2,0.5,0.5,0.9],[-11,3,47,0.9,1.6,0.6,0.6,1.2],
+ [-2,6,56,0.9,0.7,0.7,0.5,0.5],[2,6,57,0.8,0.9,0.6,0.5,0.6]
+];
+extraFurnDefs.forEach(d=>addOpenable(d[0],d[1],d[2],d[3],d[4],d[5],d[6],d[7]));
+function revealKeyIfReady(i){ const f=furn.find(x=>x.keyIdx===i); if(noteRead[i]&&f&&f.open) keys[i].visible=true; }
 
 // ===== jumpscare e rumori ambientali =====
 const noises=["Un tonfo sordo, alle tue spalle.","Passi. Poi silenzio.","Qualcosa ha respirato vicino al tuo orecchio.","Un sussurro, in una lingua che non conosci.","Il pavimento scricchiola sopra di te... ma non c'è nessun piano sopra."];
@@ -325,8 +366,9 @@ function tryGrab(){
   } else if(nearItem.kind==='furniture'){
     const f=nearItem.obj; f.open=!f.open;
     if(f.open){
-      if(f.scare&&!f.used){ f.used=true; jumpscare("Qualcosa si è mosso dentro l'armadio."); }
-      revealKeyIfReady(f.keyIdx);
+      if(f.scare&&!f.used){ f.used=true; jumpscare(f.keyIdx===4?"Qualcosa si è mosso dentro l'armadio.":noises[Math.floor(Math.random()*noises.length)]); }
+      else if(f.keyIdx===undefined&&!f.used){ f.used=true; toast('Vuoto. Solo polvere.',1800); }
+      if(f.keyIdx!==undefined) revealKeyIfReady(f.keyIdx);
     }
   } else if(nearItem.kind==='door'){
     doorOpen=true;
