@@ -8,8 +8,9 @@
 :root{ --text:#c9b896; --blood:#8a1414; --panel:rgba(5,4,3,.92); }
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;overflow:hidden;background:#000;font-family:Georgia,'Times New Roman',serif;
-  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);}
-canvas{display:block;width:100%;height:100%;}
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  touch-action:none;overscroll-behavior:none;}
+canvas{display:block;width:100%;height:100%;touch-action:none;}
 #hud{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));left:14px;right:14px;display:flex;
   justify-content:space-between;color:var(--text);z-index:5;pointer-events:none;text-shadow:0 0 6px #000;font-size:14px;}
 #toast{position:fixed;bottom:calc(60px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;
@@ -29,21 +30,17 @@ button{background:var(--blood);color:#e8d9c0;border:1px solid #4a1010;padding:13
 #notePopup .box{background:#12100c;border:1px solid #4a3a2a;padding:24px;max-width:420px;color:var(--text);
   font-style:italic;line-height:1.75;box-shadow:0 0 30px rgba(138,20,20,.3);font-size:14.5px;}
 #flash{position:fixed;inset:0;background:#8a1414;opacity:0;pointer-events:none;z-index:25;transition:opacity .08s;}
-#crosshair{position:fixed;top:50%;left:50%;width:5px;height:5px;background:rgba(201,184,150,.6);border-radius:50%;
-  transform:translate(-50%,-50%);z-index:5;}
-#vignette{position:fixed;inset:0;pointer-events:none;z-index:4;box-shadow:inset 0 0 180px 60px rgba(0,0,0,.88);}
 #rotateOverlay{position:fixed;inset:0;background:#000;color:var(--text);z-index:30;display:none;
   flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;}
 #rotateOverlay.show{display:flex;}
-#rotateIcon{font-size:52px;margin-bottom:16px;animation:spin 1.8s ease-in-out infinite;}
-@keyframes spin{0%,100%{transform:rotate(0deg);}50%{transform:rotate(90deg);}}
-#touchControls{position:fixed;inset:0;z-index:8;display:none;}
+#rotateIcon{font-size:52px;margin-bottom:16px;}
+#touchControls{position:fixed;inset:0;z-index:8;display:none;touch-action:none;}
 #touchControls.show{display:block;}
 #joyBase{position:fixed;left:26px;bottom:calc(26px + env(safe-area-inset-bottom,0px));width:110px;height:110px;
-  border-radius:50%;background:rgba(201,184,150,.1);border:2px solid rgba(201,184,150,.35);}
+  border-radius:50%;background:rgba(201,184,150,.1);border:2px solid rgba(201,184,150,.35);touch-action:none;}
 #joyThumb{position:absolute;left:35px;top:35px;width:40px;height:40px;border-radius:50%;
   background:rgba(201,184,150,.4);pointer-events:none;}
-#lookZone{position:fixed;right:0;top:0;bottom:0;width:55%;}
+#lookZone{position:fixed;right:0;top:0;bottom:0;width:55%;touch-action:none;}
 #torchBtn{position:fixed;right:26px;bottom:calc(26px + env(safe-area-inset-bottom,0px));width:72px;height:72px;
   border-radius:50%;background:rgba(201,184,150,.12);border:2px solid rgba(201,184,150,.35);
   display:flex;align-items:center;justify-content:center;font-size:28px;pointer-events:auto;}
@@ -58,7 +55,7 @@ button{background:var(--blood);color:#e8d9c0;border:1px solid #4a1010;padding:13
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="vignette"></div><div id="crosshair"></div><div id="flash"></div>
+<div id="flash"></div>
 <div id="hud">
   <div>Appunti: <span id="noteCount">0</span>/10</div>
   <div>Chiavi: <span id="keyCount">0</span>/5</div>
@@ -77,6 +74,7 @@ button{background:var(--blood);color:#e8d9c0;border:1px solid #4a1010;padding:13
 <div id="rotateOverlay">
   <div id="rotateIcon">📱</div>
   <p>Ruota il dispositivo in <strong>orizzontale</strong> per giocare.</p>
+  <button id="btnForceLandscape">Continua comunque</button>
 </div>
 
 <div class="overlay hidden" id="startScreen">
@@ -84,7 +82,7 @@ button{background:var(--blood);color:#e8d9c0;border:1px solid #4a1010;padding:13
   <p>1897. La famiglia Ravenscroft scomparve senza lasciare traccia. Nessuno mise più piede in quella casa.<br><br>
   12 gennaio 1915. Il detective Elliot Crane ferma l'auto davanti al cancello arrugginito. Prende la torcia dal sedile e scende, deciso a scoprire la verità... senza sapere che è proprio lui, questa volta, a cacciarsi nei guai.</p>
   <p id="controlsHint" style="font-size:12.5px;opacity:.7"></p>
-  <p style="font-size:12.5px;opacity:.7">Trova 10 appunti: 5 raccontano la storia, 5 nascondono indizi sulle chiavi. Servono tutte e 5 le chiavi per aprire la porta sigillata in soffitta.</p>
+  <p style="font-size:12.5px;opacity:.7">Trova 10 appunti: 5 raccontano la storia, 5 nascondono indizi sulle chiavi. Le chiavi sono nascoste dentro i mobili: apri ciò che trovi. Servono tutte e 5 le chiavi per aprire la porta sigillata in soffitta.</p>
   <button id="btnStart">Scendi dall'auto</button>
 </div>
 
@@ -135,7 +133,7 @@ addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updat
 scene.add(new THREE.AmbientLight(0x332c22,2.2));
 const flashlight=new THREE.SpotLight(0xfff2d0,0,20,0.65,0.5,1.1);
 flashlight.position.set(0,0,0); camera.add(flashlight); flashlight.target.position.set(0,0,-1); camera.add(flashlight.target);
-const fillLight=new THREE.PointLight(0x8899bb,1.3,10); camera.add(fillLight); // luce di sicurezza sempre accesa vicino al giocatore
+const fillLight=new THREE.PointLight(0x8899bb,1.3,10); camera.add(fillLight);
 scene.add(camera);
 let flOn=false;
 
@@ -143,7 +141,7 @@ const flickers=[];
 const floorMat=new THREE.MeshStandardMaterial({color:0x2a2018,roughness:1});
 const wallMat=new THREE.MeshStandardMaterial({color:0x1c1712,roughness:1});
 const ceilMat=new THREE.MeshStandardMaterial({color:0x0f0c09,roughness:1});
-const walls=[]; // {id,minX,maxX,minZ,maxZ,solid}
+const walls=[];
 function addFloorCeil(x,z,w,d,ly){
   const f=new THREE.Mesh(new THREE.BoxGeometry(w,0.2,d),floorMat); f.position.set(x,ly,z); scene.add(f);
   const c=new THREE.Mesh(new THREE.BoxGeometry(w,0.2,d),ceilMat); c.position.set(x,ly+3,z); scene.add(c);
@@ -156,31 +154,30 @@ function wallBox(x,z,w,h,d,ly,id){
 function pointLight(x,z,ly,col,inten){
   const l=new THREE.PointLight(col||0xffaa55,(inten||0.9)*1.8,14); l.position.set(x,ly+2.3,z); scene.add(l); flickers.push(l);
 }
+const furnitureMat=new THREE.MeshStandardMaterial({color:0x3a2a1c,roughness:0.9});
+const fabricMat=new THREE.MeshStandardMaterial({color:0x5a3234,roughness:1});
+const metalMat=new THREE.MeshStandardMaterial({color:0x8a8a8a,roughness:0.4,metalness:0.6});
+function box(x,y,z,w,h,d,mat,ry){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x,y,z); if(ry)m.rotation.y=ry; scene.add(m); return m;
+}
 
 // ===== GROUND FLOOR (ly=0) main corridor z0-26 =====
 addFloorCeil(0,13,4,26,0);
 wallBox(-2,10,0.3,3,6,0);  wallBox(-2,20,0.3,3,4,0); wallBox(-2,25,0.3,3,2,0);
 wallBox(2,3.5,0.3,3,7,0);  wallBox(2,16,0.3,3,4,0);  wallBox(2,25,0.3,3,2,0);
 pointLight(0,3,0,0xffaa55,1); pointLight(0,13,0,0xff8844,0.8); pointLight(0,23,0,0xff6633,0.7);
-// left gap z1-5 basement alcove (no wall there)
-// Salotto (right) z6-12
 addFloorCeil(7,9,10,6,0);
 wallBox(2,7,0.3,3,1,0); wallBox(12,9,0.3,3,6,0); wallBox(7,6,10,3,0.3,0); wallBox(7,12,10,3,0.3,0);
 pointLight(7,9,0,0xffaa55,1);
-// Cucina (left) z14-20
 addFloorCeil(-7,17,10,6,0);
 wallBox(-2,17,0.3,3,1,0); wallBox(-12,17,0.3,3,6,0); wallBox(-7,14,10,3,0.3,0); wallBox(-7,20,10,3,0.3,0);
 pointLight(-7,17,0,0xffaa55,1);
-// Bagno (right) z22-26
 addFloorCeil(6,24,6,4,0);
 wallBox(2,24,0.3,3,2,0); wallBox(9,24,0.3,3,4,0); wallBox(6,22,6,3,0.3,0); wallBox(6,26,6,3,0.3,0);
 pointLight(6,24,0,0xffdd99,0.7);
-// Scantinato (basement, ly=-3) reached by walking down the west alcove (x -2 to -8, z1-5)
 addFloorCeil(-12,3,10,8,-3);
 wallBox(-8,0,0.3,3,7,-3); wallBox(-17,3,0.3,3,8,-3); wallBox(-12,-1,10,3,0.3,-3); wallBox(-12,7,10,3,0.3,-3);
 pointLight(-12,3,-3,0x5566aa,0.6);
-
-// stair up ground->first z26-32 (no rooms, straight)
 wallBox(-2,29,0.3,3,6,0); wallBox(2,29,0.3,3,6,0);
 
 // ===== FIRST FLOOR (ly=3) corridor z32-48 =====
@@ -188,25 +185,21 @@ addFloorCeil(0,40,4,16,3);
 wallBox(-2,35,0.3,3,6,3); wallBox(-2,46,0.3,3,4,3);
 wallBox(2,35,0.3,3,6,3);  wallBox(2,46,0.3,3,4,3);
 pointLight(0,33,3,0xffaa55,0.9); pointLight(0,44,3,0xff8844,0.8);
-// Camera da letto (right) z34-40
 addFloorCeil(7,37,10,6,3);
 wallBox(2,36,0.3,3,1,3); wallBox(12,37,0.3,3,6,3); wallBox(7,34,10,3,0.3,3); wallBox(7,40,10,3,0.3,3);
 pointLight(7,37,3,0xffaa88,1);
-// Stanza del bambino (left) z42-48
 addFloorCeil(-7,45,10,6,3);
 wallBox(-2,44,0.3,3,1,3); wallBox(-12,45,0.3,3,6,3); wallBox(-7,42,10,3,0.3,3); wallBox(-7,48,10,3,0.3,3);
 pointLight(-7,45,3,0xffaa88,1);
-
-// stair up first->attic z48-54
 wallBox(-2,51,0.3,3,6,3); wallBox(2,51,0.3,3,6,3);
 
-// ===== ATTIC / SOFFITTA (ly=6) z54-62, locked door at z60 =====
+// ===== ATTIC (ly=6) z54-62, locked door at z60 =====
 addFloorCeil(0,58,8,8,6);
 wallBox(-4,58,0.3,3,8,6); wallBox(4,58,0.3,3,8,6); wallBox(0,54,8,3,0.3,6);
 pointLight(0,58,6,0xffcc88,0.7);
 const lockedDoor=wallBox(0,60.3,4,3,0.3,6,'door');
 
-// ===== GRAVEYARD (beyond the door, ly=6) z62-76 =====
+// ===== GRAVEYARD (ly=6) z62-76 =====
 addFloorCeil(0,69,12,14,6);
 wallBox(-6,69,0.3,3,14,6); wallBox(6,69,0.3,3,14,6); wallBox(0,76,12,3,0.3,6);
 pointLight(0,66,6,0x5577aa,0.35); pointLight(0,73,6,0x445588,0.3);
@@ -216,6 +209,26 @@ for(let i=0;i<12;i++){
   s.position.set(-5+Math.random()*10, 6+0.6, 63+Math.random()*11);
   s.rotation.y=Math.random()*0.4-0.2; scene.add(s);
 }
+
+// ===== DECOR: mobili sparsi e ritratti di famiglia =====
+box(9,0.5,10,1.6,1,0.7,fabricMat); // divano salotto
+box(-9,0.9,15,1.4,1.8,0.6,furnitureMat); // madia cucina
+box(9,0.4,36,1.8,0.8,1,furnitureMat); // letto camera
+box(-9,0.7,47,0.9,1.4,0.6,furnitureMat); // scaffale bambino
+function photoTexture(){
+  const cnv=document.createElement('canvas'); cnv.width=128; cnv.height=160; const g=cnv.getContext('2d');
+  g.fillStyle='#e8d9c0'; g.fillRect(0,0,128,160);
+  g.fillStyle='#2a2018'; g.fillRect(8,8,112,144);
+  g.fillStyle='#4a3a2a'; g.beginPath(); g.ellipse(64,58,22,28,0,0,7); g.fill();
+  g.fillStyle='#5a4636'; g.fillRect(30,98,68,52);
+  return new THREE.CanvasTexture(cnv);
+}
+const photoTex=photoTexture();
+function addPhoto(x,y,z,ry){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(0.9,1.1),new THREE.MeshBasicMaterial({map:photoTex}));
+  m.position.set(x,y,z); m.rotation.y=ry; scene.add(m);
+}
+addPhoto(-1.84,2,8,Math.PI/2); addPhoto(1.84,2,15,-Math.PI/2); addPhoto(-1.84,2,22,Math.PI/2);
 
 // ===== NOTES (10) =====
 function noteMesh(col){ return new THREE.Mesh(new THREE.SphereGeometry(0.14,10,10),new THREE.MeshBasicMaterial({color:col||0xffdd88})); }
@@ -227,11 +240,11 @@ const loreTexts=[
  "\"Elliot, se leggi questo: la porta in soffitta non va aperta. Ma so che la aprirai comunque.\" — nota di un detective precedente, mai più tornato"
 ];
 const clueTexts=[
- "\"La prima chiave giace dove il freddo scende sottoterra, tra la polvere della cantina.\"",
- "\"La seconda chiave dorme sotto il velluto consumato di una vecchia poltrona, in salotto.\"",
- "\"La terza chiave è nascosta dietro i fornelli anneriti dal tempo, in cucina.\"",
- "\"La quarta chiave riposa sotto il materasso della camera da letto padronale.\"",
- "\"La quinta chiave è cucita dentro un vecchio orsacchiotto, nella stanza del bambino.\""
+ "\"La prima chiave giace dentro un vecchio baule, tra la polvere della cantina.\"",
+ "\"La seconda chiave dorme dentro una madia consumata, in salotto.\"",
+ "\"La terza chiave è nascosta dentro un mobiletto accanto ai fornelli, in cucina.\"",
+ "\"La quarta chiave riposa in un cassetto ai piedi del letto padronale.\"",
+ "\"La quinta chiave è chiusa dentro un vecchio armadio, nella stanza del bambino. Non aprirlo da solo di notte.\""
 ];
 const noteDefs=[
  {p:[0,1.2,2],  t:loreTexts[0]},
@@ -248,33 +261,54 @@ const noteDefs=[
 const notes=[]; let notesCollected=0;
 noteDefs.forEach((d,i)=>{ const n=noteMesh(); n.position.set(d.p[0],d.p[1],d.p[2]); n.userData=d; n.userData.i=i; scene.add(n); notes.push(n); });
 
-// ===== KEYS (5), hidden until their clue note is read =====
+// ===== KEYS (5), hidden until nota letta + mobile aperto =====
 const keyDefs=[
- {p:[-12,1.0,6],ly:-3},   // scantinato
- {p:[7,1.0,7],ly:0},      // salotto
- {p:[-7,1.0,15],ly:0},    // cucina
- {p:[7,4.0,35],ly:3},     // camera da letto
- {p:[-7,4.0,47],ly:3}     // stanza del bambino
+ {p:[-12,1.0,6],ly:-3},
+ {p:[7,1.0,7],ly:0},
+ {p:[-7,1.0,15],ly:0},
+ {p:[7,4.0,35],ly:3},
+ {p:[-7,4.0,47],ly:3}
 ];
 const keys=[]; let keysCollected=0;
+const noteRead=[false,false,false,false,false];
 keyDefs.forEach((d,i)=>{
   const k=new THREE.Mesh(new THREE.TorusGeometry(0.16,0.05,8,12),new THREE.MeshBasicMaterial({color:0xd4af37}));
   k.position.set(d.p[0],d.p[1],d.p[2]); k.visible=false; k.userData.i=i; scene.add(k); keys.push(k);
 });
 
-// ===== ambient jumpscares =====
+// ===== MOBILI INTERATTIVI (uno per chiave, con sportello apribile) =====
+function makeDoor(w,h){ const g=new THREE.BoxGeometry(w,h,0.06); g.translate(w/2,0,0); return new THREE.Mesh(g,furnitureMat); }
+const furnMeta=[
+ {bw:1.1,bh:0.9,bd:0.8,dw:1.0,dh:0.8},
+ {bw:1.3,bh:1.0,bd:1.0,dw:0.9,dh:0.75},
+ {bw:1.2,bh:1.3,bd:0.7,dw:0.7,dh:1.0},
+ {bw:1.4,bh:0.6,bd:0.9,dw:0.5,dh:0.5},
+ {bw:1.1,bh:1.8,bd:0.6,dw:0.9,dh:1.5}
+];
+const furn=[];
+keyDefs.forEach((d,i)=>{
+  const m=furnMeta[i];
+  const grp=new THREE.Group(); grp.position.set(d.p[0],d.ly,d.p[2]-0.5); scene.add(grp);
+  const body=new THREE.Mesh(new THREE.BoxGeometry(m.bw,m.bh,m.bd),furnitureMat); body.position.y=m.bh/2; grp.add(body);
+  const door=makeDoor(m.dw,m.dh); door.position.set(-m.dw/2,m.bh/2,m.bd/2+0.01); grp.add(door);
+  furn.push({door,open:false,x:d.p[0],z:d.p[2]-0.5,ly:d.ly,keyIdx:i,scare:i===4,used:false});
+});
+function revealKeyIfReady(i){ const f=furn[i]; if(noteRead[i]&&f.open) keys[i].visible=true; }
+
+// ===== jumpscare e rumori ambientali =====
 const noises=["Un tonfo sordo, alle tue spalle.","Passi. Poi silenzio.","Qualcosa ha respirato vicino al tuo orecchio.","Un sussurro, in una lingua che non conosci.","Il pavimento scricchiola sopra di te... ma non c'è nessun piano sopra."];
 let scareTimer=600+Math.random()*900;
 function toast(msg,ms){ const t=document.getElementById('toast'); t.textContent=msg; t.style.opacity='1'; setTimeout(()=>t.style.opacity='0',ms||3000); }
-function ambientScare(){
-  const f=document.getElementById('flash');
-  f.style.opacity='0.55'; setTimeout(()=>f.style.opacity='0',90);
-  toast(noises[Math.floor(Math.random()*noises.length)],2800);
-  scareTimer=700+Math.random()*1200;
+function jumpscare(msg){
+  const f=document.getElementById('flash'); f.style.opacity='.8'; setTimeout(()=>f.style.opacity='0',150);
+  toast(msg,3200);
+  const baseFov=camera.fov; camera.fov=baseFov+8; camera.updateProjectionMatrix();
+  setTimeout(()=>{camera.fov=baseFov;camera.updateProjectionMatrix();},220);
 }
+function ambientScare(){ jumpscare(noises[Math.floor(Math.random()*noises.length)]); scareTimer=700+Math.random()*1200; }
 
 let started=false, ended=false, doorOpen=false, graveyardEndTriggered=false, isMobile=false;
-let yaw=0,pitch=0; const keysDown={};
+let yaw=0,pitch=0,prevYaw=0,turnAccum=0,turnCd=0; const keysDown={};
 let joyVec={x:0,y:0}, joyId=null, lookId=null;
 
 function toggleTorch(){ flOn=!flOn; flashlight.intensity=flOn?4.5:0; document.getElementById('fState').textContent=flOn?'accesa':'spenta'; }
@@ -288,6 +322,12 @@ function tryGrab(){
   } else if(nearItem.kind==='key'){
     nearItem.obj.visible=false; keysCollected++; document.getElementById('keyCount').textContent=keysCollected;
     toast(keysCollected>=5?'Hai tutte le chiavi. Vai alla porta della soffitta e interagisci per aprirla.':'Hai raccolto una chiave. ('+keysCollected+'/5)',3000);
+  } else if(nearItem.kind==='furniture'){
+    const f=nearItem.obj; f.open=!f.open;
+    if(f.open){
+      if(f.scare&&!f.used){ f.used=true; jumpscare("Qualcosa si è mosso dentro l'armadio."); }
+      revealKeyIfReady(f.keyIdx);
+    }
   } else if(nearItem.kind==='door'){
     doorOpen=true;
     toast('Le cinque chiavi hanno sbloccato la porta della soffitta...',3500);
@@ -305,17 +345,19 @@ document.addEventListener('mousemove',e=>{
   yaw-=e.movementX*0.0022; pitch-=e.movementY*0.0022; pitch=Math.max(-1.3,Math.min(1.3,pitch));
 });
 
-// ===== touch controls =====
 const joyBase=document.getElementById('joyBase'), joyThumb=document.getElementById('joyThumb'), lookZone=document.getElementById('lookZone');
 let joyOrigin={x:0,y:0}, lookLast={x:0,y:0};
 joyBase.addEventListener('touchstart',e=>{
+  e.preventDefault();
   const t=e.changedTouches[0]; joyId=t.identifier;
   const r=joyBase.getBoundingClientRect(); joyOrigin={x:r.left+r.width/2,y:r.top+r.height/2};
-},{passive:true});
+},{passive:false});
 lookZone.addEventListener('touchstart',e=>{
+  e.preventDefault();
   const t=e.changedTouches[0]; lookId=t.identifier; lookLast={x:t.clientX,y:t.clientY};
-},{passive:true});
+},{passive:false});
 document.addEventListener('touchmove',e=>{
+  e.preventDefault();
   for(const t of e.changedTouches){
     if(t.identifier===joyId){
       let dx=t.clientX-joyOrigin.x, dy=t.clientY-joyOrigin.y;
@@ -328,7 +370,7 @@ document.addEventListener('touchmove',e=>{
       yaw-=dx*0.0035; pitch-=dy*0.0035; pitch=Math.max(-1.3,Math.min(1.3,pitch));
     }
   }
-},{passive:true});
+},{passive:false});
 document.addEventListener('touchend',e=>{
   for(const t of e.changedTouches){
     if(t.identifier===joyId){ joyId=null; joyVec={x:0,y:0}; joyThumb.style.transform='translate(0,0)'; }
@@ -338,28 +380,32 @@ document.addEventListener('touchend',e=>{
 document.getElementById('torchBtn').addEventListener('touchstart',e=>{ e.preventDefault(); if(started) toggleTorch(); });
 document.getElementById('grabBtn').addEventListener('touchstart',e=>{ e.preventDefault(); if(started) tryGrab(); });
 
+let orientationBypassed=false;
 function checkOrientation(){
   const ov=document.getElementById('rotateOverlay');
-  if(isMobile && started && !ended && innerWidth<innerHeight) ov.classList.add('show');
+  if(isMobile && started && !ended && !orientationBypassed && innerWidth<innerHeight) ov.classList.add('show');
   else ov.classList.remove('show');
 }
 addEventListener('resize',checkOrientation);
 addEventListener('orientationchange',checkOrientation);
+document.getElementById('btnForceLandscape').addEventListener('click',()=>{ orientationBypassed=true; checkOrientation(); });
+document.getElementById('btnForceLandscape').addEventListener('touchstart',e=>{ e.preventDefault(); orientationBypassed=true; checkOrientation(); });
 
 document.getElementById('btnPC').onclick=()=>{
   isMobile=false;
   document.getElementById('deviceScreen').classList.add('hidden');
   document.getElementById('startScreen').classList.remove('hidden');
-  document.getElementById('controlsHint').textContent="WASD per muoverti, mouse per guardarti intorno, F per la torcia, E per afferrare gli oggetti, click per iniziare.";
+  document.getElementById('controlsHint').textContent="WASD per muoverti, mouse per guardarti intorno, F per la torcia, E per interagire/afferrare, click per iniziare.";
 };
 document.getElementById('btnMobile').onclick=()=>{
   isMobile=true;
   document.getElementById('touchControls').classList.add('show');
   document.getElementById('deviceScreen').classList.add('hidden');
   document.getElementById('startScreen').classList.remove('hidden');
-  document.getElementById('controlsHint').textContent="Joystick a sinistra per muoverti, trascina a destra per guardarti intorno, tocca ✋ per afferrare gli oggetti vicini, tocca 🔦 per la torcia. Gioca in orizzontale.";
+  document.getElementById('controlsHint').textContent="Joystick a sinistra per muoverti, trascina a destra per guardarti intorno, tocca ✋ per interagire/afferrare, tocca 🔦 per la torcia. Gioca in orizzontale.";
   if(screen.orientation && screen.orientation.lock){ screen.orientation.lock('landscape').catch(()=>{}); }
   checkOrientation();
+  setTimeout(checkOrientation,400);
 };
 
 function collide(nx,nz,r){
@@ -383,7 +429,7 @@ function showNote(d){
   document.getElementById('notePopup').classList.remove('hidden');
   document.exitPointerLock();
   setTimeout(()=>{ document.getElementById('notePopup').classList.add('hidden'); },4200);
-  if(d.key!==undefined){ keys[d.key].visible=true; }
+  if(d.key!==undefined){ noteRead[d.key]=true; revealKeyIfReady(d.key); }
 }
 
 function endGame(){
@@ -399,6 +445,13 @@ function animate(){
   if(!started||ended){ renderer.render(scene,camera); return; }
 
   camera.rotation.order='YXZ'; camera.rotation.y=yaw; camera.rotation.x=pitch;
+
+  let dyaw=yaw-prevYaw; dyaw=Math.atan2(Math.sin(dyaw),Math.cos(dyaw)); turnAccum=turnAccum*0.9+Math.abs(dyaw); prevYaw=yaw;
+  if(turnCd>0) turnCd--;
+  if(turnAccum>0.55 && turnCd<=0 && camera.position.z<62){
+    jumpscare("Ti sei girato... e per un istante non eri solo.");
+    turnCd=2400; turnAccum=0;
+  }
 
   let mx=0,mz=0;
   if(isMobile){ mx=joyVec.x; mz=joyVec.y; }
@@ -431,6 +484,12 @@ function animate(){
     const d=camera.position.distanceTo(k.position);
     if(d<closestD){ closestD=d; foundItem={kind:'key',obj:k}; }
   }
+  for(const f of furn){
+    f.door.rotation.y+=((f.open?-1.9:0)-f.door.rotation.y)*0.12;
+    if(Math.abs(camera.position.y-(f.ly+1.65))>2.5) continue;
+    const dist=Math.hypot(camera.position.x-f.x,camera.position.z-f.z)-0.8;
+    if(dist<closestD){ closestD=dist; foundItem={kind:'furniture',obj:f}; }
+  }
   nearItem=foundItem;
   if(!nearItem && !doorOpen && keysCollected>=5){
     const dDoor=Math.hypot(camera.position.x-0,camera.position.z-60.3);
@@ -438,7 +497,7 @@ function animate(){
   }
   const prompt=document.getElementById('interactPrompt'), grabBtn=document.getElementById('grabBtn');
   if(nearItem){
-    const label=nearItem.kind==='door'?'Premi E per aprire la porta':'Premi E per raccogliere';
+    const label=nearItem.kind==='door'?'Premi E per aprire la porta':nearItem.kind==='furniture'?'Premi E per aprire/chiudere':'Premi E per raccogliere';
     prompt.textContent=isMobile?'':label;
     prompt.classList.toggle('show',!isMobile);
     grabBtn.classList.add('active');
@@ -468,9 +527,10 @@ document.getElementById('btnStart').onclick=()=>{
   started=true; ended=false; notesCollected=0; keysCollected=0; doorOpen=false; graveyardEndTriggered=false;
   document.getElementById('noteCount').textContent='0'; document.getElementById('keyCount').textContent='0';
   flOn=true; flashlight.intensity=4.5; document.getElementById('fState').textContent='accesa';
-  notes.forEach(n=>n.visible=true); keys.forEach(k=>k.visible=false);
+  notes.forEach(n=>n.visible=true); keys.forEach(k=>k.visible=false); furn.forEach(f=>{f.open=false;f.used=false;});
+  noteRead.fill(false);
   nearItem=null; document.getElementById('interactPrompt').classList.remove('show'); document.getElementById('grabBtn').classList.remove('active');
-  camera.position.set(0,1.65,0); yaw=Math.PI; pitch=0;
+  camera.position.set(0,1.65,0); yaw=Math.PI; pitch=0; prevYaw=yaw; turnAccum=0; turnCd=0;
   if(!isMobile) cv.requestPointerLock();
   checkOrientation();
 };
