@@ -122,17 +122,20 @@ cv.addEventListener('webglcontextlost',e=>{
   document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;inset:0;z-index:99;background:#000;color:#c9b896;font-family:Georgia,serif;display:flex;align-items:center;justify-content:center;padding:40px;text-align:center">Il contesto grafico WebGL è stato perso (memoria insufficiente sul dispositivo). Ricarica la pagina.</div>');
 });
 const scene=new THREE.Scene();
-scene.fog=new THREE.FogExp2(0x000000,0.05);
+scene.fog=new THREE.FogExp2(0x000000,0.028);
 const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,0.1,100);
 const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.setSize(innerWidth,innerHeight);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.4;
+renderer.outputEncoding=THREE.sRGBEncoding;
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 
-scene.add(new THREE.AmbientLight(0x201a16,1.3));
-const flashlight=new THREE.SpotLight(0xfff2d0,0,14,0.5,0.6,1.4);
+scene.add(new THREE.AmbientLight(0x332c22,2.2));
+const flashlight=new THREE.SpotLight(0xfff2d0,0,20,0.65,0.5,1.1);
 flashlight.position.set(0,0,0); camera.add(flashlight); flashlight.target.position.set(0,0,-1); camera.add(flashlight.target);
-const fillLight=new THREE.PointLight(0x8899bb,0.7,7); camera.add(fillLight); // luce di sicurezza sempre accesa vicino al giocatore
+const fillLight=new THREE.PointLight(0x8899bb,1.3,10); camera.add(fillLight); // luce di sicurezza sempre accesa vicino al giocatore
 scene.add(camera);
 let flOn=false;
 
@@ -151,7 +154,7 @@ function wallBox(x,z,w,h,d,ly,id){
   walls.push(rec); return rec;
 }
 function pointLight(x,z,ly,col,inten){
-  const l=new THREE.PointLight(col||0xffaa55,inten||0.9,9); l.position.set(x,ly+2.3,z); scene.add(l); flickers.push(l);
+  const l=new THREE.PointLight(col||0xffaa55,(inten||0.9)*1.8,14); l.position.set(x,ly+2.3,z); scene.add(l); flickers.push(l);
 }
 
 // ===== GROUND FLOOR (ly=0) main corridor z0-26 =====
@@ -274,7 +277,7 @@ let started=false, ended=false, doorOpen=false, graveyardEndTriggered=false, isM
 let yaw=0,pitch=0; const keysDown={};
 let joyVec={x:0,y:0}, joyId=null, lookId=null;
 
-function toggleTorch(){ flOn=!flOn; flashlight.intensity=flOn?2.2:0; document.getElementById('fState').textContent=flOn?'accesa':'spenta'; }
+function toggleTorch(){ flOn=!flOn; flashlight.intensity=flOn?4.5:0; document.getElementById('fState').textContent=flOn?'accesa':'spenta'; }
 
 let nearItem=null;
 function tryGrab(){
@@ -464,7 +467,7 @@ document.getElementById('btnStart').onclick=()=>{
   document.getElementById('startScreen').classList.add('hidden');
   started=true; ended=false; notesCollected=0; keysCollected=0; doorOpen=false; graveyardEndTriggered=false;
   document.getElementById('noteCount').textContent='0'; document.getElementById('keyCount').textContent='0';
-  flOn=true; flashlight.intensity=2.2; document.getElementById('fState').textContent='accesa';
+  flOn=true; flashlight.intensity=4.5; document.getElementById('fState').textContent='accesa';
   notes.forEach(n=>n.visible=true); keys.forEach(k=>k.visible=false);
   nearItem=null; document.getElementById('interactPrompt').classList.remove('show'); document.getElementById('grabBtn').classList.remove('active');
   camera.position.set(0,1.65,0); yaw=Math.PI; pitch=0;
