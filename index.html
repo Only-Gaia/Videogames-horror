@@ -112,7 +112,15 @@ button{background:var(--blood);color:#e8d9c0;border:1px solid #4a1010;padding:13
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function(){
+if(typeof THREE==='undefined'){
+  document.body.innerHTML='<div style="color:#c9b896;font-family:Georgia,serif;padding:40px;text-align:center">Errore: la libreria Three.js non si è caricata (controlla la connessione o un blocco script/adblock) e il gioco non può partire.</div>';
+  return;
+}
 const cv=document.getElementById('c');
+cv.addEventListener('webglcontextlost',e=>{
+  e.preventDefault();
+  document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;inset:0;z-index:99;background:#000;color:#c9b896;font-family:Georgia,serif;display:flex;align-items:center;justify-content:center;padding:40px;text-align:center">Il contesto grafico WebGL è stato perso (memoria insufficiente sul dispositivo). Ricarica la pagina.</div>');
+});
 const scene=new THREE.Scene();
 scene.fog=new THREE.FogExp2(0x000000,0.05);
 const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,0.1,100);
@@ -121,9 +129,10 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.setSize(innerWidth,innerHeight);
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 
-scene.add(new THREE.AmbientLight(0x151210,0.85));
+scene.add(new THREE.AmbientLight(0x201a16,1.3));
 const flashlight=new THREE.SpotLight(0xfff2d0,0,14,0.5,0.6,1.4);
 flashlight.position.set(0,0,0); camera.add(flashlight); flashlight.target.position.set(0,0,-1); camera.add(flashlight.target);
+const fillLight=new THREE.PointLight(0x8899bb,0.7,7); camera.add(fillLight); // luce di sicurezza sempre accesa vicino al giocatore
 scene.add(camera);
 let flOn=false;
 
@@ -455,7 +464,7 @@ document.getElementById('btnStart').onclick=()=>{
   document.getElementById('startScreen').classList.add('hidden');
   started=true; ended=false; notesCollected=0; keysCollected=0; doorOpen=false; graveyardEndTriggered=false;
   document.getElementById('noteCount').textContent='0'; document.getElementById('keyCount').textContent='0';
-  flOn=false; flashlight.intensity=0; document.getElementById('fState').textContent='spenta';
+  flOn=true; flashlight.intensity=2.2; document.getElementById('fState').textContent='accesa';
   notes.forEach(n=>n.visible=true); keys.forEach(k=>k.visible=false);
   nearItem=null; document.getElementById('interactPrompt').classList.remove('show'); document.getElementById('grabBtn').classList.remove('active');
   camera.position.set(0,1.65,0); yaw=Math.PI; pitch=0;
