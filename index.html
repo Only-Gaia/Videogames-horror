@@ -458,7 +458,7 @@ document.getElementById('btnStart').onclick=()=>{
   flOn=false; flashlight.intensity=0; document.getElementById('fState').textContent='spenta';
   notes.forEach(n=>n.visible=true); keys.forEach(k=>k.visible=false);
   nearItem=null; document.getElementById('interactPrompt').classList.remove('show'); document.getElementById('grabBtn').classList.remove('active');
-  camera.position.set(0,1.65,0); yaw=0; pitch=0;
+  camera.position.set(0,1.65,0); yaw=Math.PI; pitch=0;
   if(!isMobile) cv.requestPointerLock();
   checkOrientation();
 };
