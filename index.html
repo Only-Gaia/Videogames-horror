@@ -47,6 +47,13 @@ button{background:var(--blood);color:#e8d9c0;border:1px solid #4a1010;padding:13
 #torchBtn{position:fixed;right:26px;bottom:calc(26px + env(safe-area-inset-bottom,0px));width:72px;height:72px;
   border-radius:50%;background:rgba(201,184,150,.12);border:2px solid rgba(201,184,150,.35);
   display:flex;align-items:center;justify-content:center;font-size:28px;pointer-events:auto;}
+#grabBtn{position:fixed;right:110px;bottom:calc(26px + env(safe-area-inset-bottom,0px));width:72px;height:72px;
+  border-radius:50%;background:rgba(201,184,150,.12);border:2px solid rgba(201,184,150,.35);
+  display:flex;align-items:center;justify-content:center;font-size:26px;pointer-events:auto;opacity:.4;transition:opacity .2s,background .2s;}
+#grabBtn.active{opacity:1;background:rgba(212,175,55,.35);border-color:#d4af37;}
+#interactPrompt{position:fixed;bottom:calc(120px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;
+  color:var(--text);z-index:6;pointer-events:none;text-shadow:0 0 8px #000;opacity:0;transition:opacity .2s;font-size:14px;}
+#interactPrompt.show{opacity:1;}
 </style>
 </head>
 <body>
@@ -58,6 +65,7 @@ button{background:var(--blood);color:#e8d9c0;border:1px solid #4a1010;padding:13
   <div>🔦 Torcia [F]: <span id="fState">spenta</span></div>
 </div>
 <div id="toast"></div>
+<div id="interactPrompt"></div>
 
 <div class="overlay" id="deviceScreen">
   <h1>LA FAMIGLIA RAVENSCROFT</h1>
@@ -83,6 +91,7 @@ button{background:var(--blood);color:#e8d9c0;border:1px solid #4a1010;padding:13
 <div id="touchControls">
   <div id="joyBase"><div id="joyThumb"></div></div>
   <div id="lookZone"></div>
+  <div id="grabBtn">✋</div>
   <div id="torchBtn">🔦</div>
 </div>
 
@@ -258,7 +267,25 @@ let joyVec={x:0,y:0}, joyId=null, lookId=null;
 
 function toggleTorch(){ flOn=!flOn; flashlight.intensity=flOn?2.2:0; document.getElementById('fState').textContent=flOn?'accesa':'spenta'; }
 
-addEventListener('keydown',e=>{ keysDown[e.key.toLowerCase()]=true; if(e.key.toLowerCase()==='f'&&started) toggleTorch(); });
+let nearItem=null;
+function tryGrab(){
+  if(!nearItem) return;
+  if(nearItem.kind==='note'){
+    nearItem.obj.visible=false; notesCollected++; document.getElementById('noteCount').textContent=notesCollected;
+    showNote(nearItem.obj.userData);
+  } else if(nearItem.kind==='key'){
+    nearItem.obj.visible=false; keysCollected++; document.getElementById('keyCount').textContent=keysCollected;
+    toast(keysCollected>=5?'Hai tutte le chiavi. Vai alla porta della soffitta e interagisci per aprirla.':'Hai raccolto una chiave. ('+keysCollected+'/5)',3000);
+  } else if(nearItem.kind==='door'){
+    doorOpen=true;
+    toast('Le cinque chiavi hanno sbloccato la porta della soffitta...',3500);
+  }
+  nearItem=null;
+  document.getElementById('interactPrompt').classList.remove('show');
+  document.getElementById('grabBtn').classList.remove('active');
+}
+
+addEventListener('keydown',e=>{ keysDown[e.key.toLowerCase()]=true; if(e.key.toLowerCase()==='f'&&started) toggleTorch(); if(e.key.toLowerCase()==='e'&&started) tryGrab(); });
 addEventListener('keyup',e=>keysDown[e.key.toLowerCase()]=false);
 cv.addEventListener('click',()=>{ if(started&&!isMobile) cv.requestPointerLock(); });
 document.addEventListener('mousemove',e=>{
@@ -297,6 +324,7 @@ document.addEventListener('touchend',e=>{
   }
 });
 document.getElementById('torchBtn').addEventListener('touchstart',e=>{ e.preventDefault(); if(started) toggleTorch(); });
+document.getElementById('grabBtn').addEventListener('touchstart',e=>{ e.preventDefault(); if(started) tryGrab(); });
 
 function checkOrientation(){
   const ov=document.getElementById('rotateOverlay');
@@ -310,14 +338,14 @@ document.getElementById('btnPC').onclick=()=>{
   isMobile=false;
   document.getElementById('deviceScreen').classList.add('hidden');
   document.getElementById('startScreen').classList.remove('hidden');
-  document.getElementById('controlsHint').textContent="WASD per muoverti, mouse per guardarti intorno, F per la torcia, click per iniziare.";
+  document.getElementById('controlsHint').textContent="WASD per muoverti, mouse per guardarti intorno, F per la torcia, E per afferrare gli oggetti, click per iniziare.";
 };
 document.getElementById('btnMobile').onclick=()=>{
   isMobile=true;
   document.getElementById('touchControls').classList.add('show');
   document.getElementById('deviceScreen').classList.add('hidden');
   document.getElementById('startScreen').classList.remove('hidden');
-  document.getElementById('controlsHint').textContent="Joystick a sinistra per muoverti, trascina a destra per guardarti intorno, tocca 🔦 per la torcia. Gioca in orizzontale.";
+  document.getElementById('controlsHint').textContent="Joystick a sinistra per muoverti, trascina a destra per guardarti intorno, tocca ✋ per afferrare gli oggetti vicini, tocca 🔦 per la torcia. Gioca in orizzontale.";
   if(screen.orientation && screen.orientation.lock){ screen.orientation.lock('landscape').catch(()=>{}); }
   checkOrientation();
 };
@@ -372,28 +400,39 @@ function animate(){
     const dx=(mx*Math.cos(yaw)+mz*Math.sin(yaw))*speed;
     const dz=(mz*Math.cos(yaw)-mx*Math.sin(yaw))*speed;
     const hitX=collide(camera.position.x+dx,camera.position.z,r);
-    if(!hitX) camera.position.x+=dx; else if(hitX.id==='door') toast('La porta è sigillata. Servono le 5 chiavi ('+keysCollected+'/5).',2500);
+    if(!hitX) camera.position.x+=dx; else if(hitX.id==='door') toast(keysCollected>=5?'Premi E (o ✋) per aprire la porta.':'La porta è sigillata. Servono le 5 chiavi ('+keysCollected+'/5).',2500);
     const hitZ=collide(camera.position.x,camera.position.z+dz,r);
-    if(!hitZ) camera.position.z+=dz; else if(hitZ.id==='door') toast('La porta è sigillata. Servono le 5 chiavi ('+keysCollected+'/5).',2500);
+    if(!hitZ) camera.position.z+=dz; else if(hitZ.id==='door') toast(keysCollected>=5?'Premi E (o ✋) per aprire la porta.':'La porta è sigillata. Servono le 5 chiavi ('+keysCollected+'/5).',2500);
   }
   camera.position.y=floorY(camera.position.x,camera.position.z)+1.65;
 
+  let closestD=1.4, foundItem=null;
   for(const n of notes){
     if(!n.visible) continue;
     n.rotation.y+=0.03;
-    if(camera.position.distanceTo(n.position)<1.4){
-      n.visible=false; notesCollected++; document.getElementById('noteCount').textContent=notesCollected;
-      showNote(n.userData);
-    }
+    const d=camera.position.distanceTo(n.position);
+    if(d<closestD){ closestD=d; foundItem={kind:'note',obj:n}; }
   }
   for(const k of keys){
     if(!k.visible) continue;
     k.rotation.z+=0.04;
-    if(camera.position.distanceTo(k.position)<1.3){
-      k.visible=false; keysCollected++; document.getElementById('keyCount').textContent=keysCollected;
-      toast('Hai raccolto una chiave. ('+keysCollected+'/5)',2500);
-      if(keysCollected>=5 && !doorOpen){ doorOpen=true; toast('Le cinque chiavi hanno sbloccato la porta della soffitta...',3500); }
-    }
+    const d=camera.position.distanceTo(k.position);
+    if(d<closestD){ closestD=d; foundItem={kind:'key',obj:k}; }
+  }
+  nearItem=foundItem;
+  if(!nearItem && !doorOpen && keysCollected>=5){
+    const dDoor=Math.hypot(camera.position.x-0,camera.position.z-60.3);
+    if(dDoor<2.3) nearItem={kind:'door'};
+  }
+  const prompt=document.getElementById('interactPrompt'), grabBtn=document.getElementById('grabBtn');
+  if(nearItem){
+    const label=nearItem.kind==='door'?'Premi E per aprire la porta':'Premi E per raccogliere';
+    prompt.textContent=isMobile?'':label;
+    prompt.classList.toggle('show',!isMobile);
+    grabBtn.classList.add('active');
+  } else {
+    prompt.classList.remove('show');
+    grabBtn.classList.remove('active');
   }
 
   scareTimer--; if(scareTimer<=0) ambientScare();
@@ -418,6 +457,7 @@ document.getElementById('btnStart').onclick=()=>{
   document.getElementById('noteCount').textContent='0'; document.getElementById('keyCount').textContent='0';
   flOn=false; flashlight.intensity=0; document.getElementById('fState').textContent='spenta';
   notes.forEach(n=>n.visible=true); keys.forEach(k=>k.visible=false);
+  nearItem=null; document.getElementById('interactPrompt').classList.remove('show'); document.getElementById('grabBtn').classList.remove('active');
   camera.position.set(0,1.65,0); yaw=0; pitch=0;
   if(!isMobile) cv.requestPointerLock();
   checkOrientation();
