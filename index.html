@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>La Famiglia Ravenscroft</title>
+<style>
+:root{ --text:#c9b896; --blood:#8a1414; --panel:rgba(5,4,3,.92); }
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;background:#000;font-family:Georgia,'Times New Roman',serif;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);}
+canvas{display:block;width:100%;height:100%;}
+#hud{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));left:14px;right:14px;display:flex;
+  justify-content:space-between;color:var(--text);z-index:5;pointer-events:none;text-shadow:0 0 6px #000;font-size:14px;}
+#toast{position:fixed;bottom:calc(60px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;
+  color:var(--text);z-index:6;pointer-events:none;text-shadow:0 0 8px #000;opacity:0;transition:opacity .5s;font-style:italic;}
+.overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:var(--panel);color:var(--text);z-index:20;text-align:center;padding:30px;}
+.hidden{display:none;}
+h1{font-size:clamp(22px,5.5vw,38px);color:var(--blood);margin-bottom:14px;letter-spacing:2px;
+  text-shadow:0 0 12px rgba(138,20,20,.8);}
+p{max-width:480px;line-height:1.7;margin-bottom:14px;opacity:.9;font-size:14.5px;}
+#credits{margin:10px 0 20px;opacity:.85;}
+#credits .creditLine{font-size:11px;letter-spacing:2px;text-transform:uppercase;opacity:.6;margin-top:12px;}
+#credits .creditName{font-size:16px;letter-spacing:1px;color:var(--text);margin-top:2px;}
+button{background:var(--blood);color:#e8d9c0;border:1px solid #4a1010;padding:13px 26px;font-size:15px;
+  border-radius:4px;margin:6px;cursor:pointer;font-family:inherit;letter-spacing:1px;}
+#notePopup{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:15;background:rgba(0,0,0,.88);}
+#notePopup .box{background:#12100c;border:1px solid #4a3a2a;padding:24px;max-width:420px;color:var(--text);
+  font-style:italic;line-height:1.75;box-shadow:0 0 30px rgba(138,20,20,.3);font-size:14.5px;}
+#flash{position:fixed;inset:0;background:#8a1414;opacity:0;pointer-events:none;z-index:25;transition:opacity .08s;}
+#crosshair{position:fixed;top:50%;left:50%;width:5px;height:5px;background:rgba(201,184,150,.6);border-radius:50%;
+  transform:translate(-50%,-50%);z-index:5;}
+#vignette{position:fixed;inset:0;pointer-events:none;z-index:4;box-shadow:inset 0 0 180px 60px rgba(0,0,0,.88);}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="vignette"></div><div id="crosshair"></div><div id="flash"></div>
+<div id="hud">
+  <div>Appunti: <span id="noteCount">0</span>/10</div>
+  <div>Chiavi: <span id="keyCount">0</span>/5</div>
+  <div>🔦 Torcia [F]: <span id="fState">spenta</span></div>
+</div>
+<div id="toast"></div>
+
+<div class="overlay" id="startScreen">
+  <h1>LA FAMIGLIA RAVENSCROFT</h1>
+  <p>1897. La famiglia Ravenscroft scomparve senza lasciare traccia. Nessuno mise più piede in quella casa.<br><br>
+  12 gennaio 1915. Il detective Elliot Crane ferma l'auto davanti al cancello arrugginito. Prende la torcia dal sedile e scende, deciso a scoprire la verità... senza sapere che è proprio lui, questa volta, a cacciarsi nei guai.</p>
+  <p style="font-size:12.5px;opacity:.7">WASD per muoverti, mouse per guardarti intorno, F per la torcia, click per iniziare. Trova 10 appunti: 5 raccontano la storia, 5 nascondono indizi sulle chiavi. Servono tutte e 5 le chiavi per aprire la porta sigillata in soffitta.</p>
+  <button id="btnStart">Scendi dall'auto</button>
+</div>
+
+<div class="overlay hidden" id="endScreen">
+  <h1 id="endTitle"></h1>
+  <p id="endText"></p>
+  <div id="credits">
+    <div class="creditLine">Developer di gioco</div>
+    <div class="creditName">Gaia E. Spinello</div>
+    <div class="creditLine">Designer personaggi e effetti</div>
+    <div class="creditName">Carlotta Cucè</div>
+  </div>
+  <button id="btnRestart">Ricomincia</button>
+</div>
+
+<div id="notePopup" class="hidden"><div class="box" id="noteText"></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+const cv=document.getElementById('c');
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x000000,0.05);
+const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,0.1,100);
+const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+
+scene.add(new THREE.AmbientLight(0x151210,0.85));
+const flashlight=new THREE.SpotLight(0xfff2d0,0,14,0.5,0.6,1.4);
+flashlight.position.set(0,0,0); camera.add(flashlight); flashlight.target.position.set(0,0,-1); camera.add(flashlight.target);
+scene.add(camera);
+let flOn=false;
+
+const flickers=[];
+const floorMat=new THREE.MeshStandardMaterial({color:0x2a2018,roughness:1});
+const wallMat=new THREE.MeshStandardMaterial({color:0x1c1712,roughness:1});
+const ceilMat=new THREE.MeshStandardMaterial({color:0x0f0c09,roughness:1});
+const walls=[]; // {id,minX,maxX,minZ,maxZ,solid}
+function addFloorCeil(x,z,w,d,ly){
+  const f=new THREE.Mesh(new THREE.BoxGeometry(w,0.2,d),floorMat); f.position.set(x,ly,z); scene.add(f);
+  const c=new THREE.Mesh(new THREE.BoxGeometry(w,0.2,d),ceilMat); c.position.set(x,ly+3,z); scene.add(c);
+}
+function wallBox(x,z,w,h,d,ly,id){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wallMat); m.position.set(x,ly+h/2,z); scene.add(m);
+  const rec={minX:x-w/2,maxX:x+w/2,minZ:z-d/2,maxZ:z+d/2,solid:true,id:id||null,mesh:m};
+  walls.push(rec); return rec;
+}
+function pointLight(x,z,ly,col,inten){
+  const l=new THREE.PointLight(col||0xffaa55,inten||0.9,9); l.position.set(x,ly+2.3,z); scene.add(l); flickers.push(l);
+}
+
+// ===== GROUND FLOOR (ly=0) main corridor z0-26 =====
+addFloorCeil(0,13,4,26,0);
+wallBox(-2,10,0.3,3,6,0);  wallBox(-2,20,0.3,3,4,0); wallBox(-2,25,0.3,3,2,0);
+wallBox(2,3.5,0.3,3,7,0);  wallBox(2,16,0.3,3,4,0);  wallBox(2,25,0.3,3,2,0);
+pointLight(0,3,0,0xffaa55,1); pointLight(0,13,0,0xff8844,0.8); pointLight(0,23,0,0xff6633,0.7);
+// left gap z1-5 basement alcove (no wall there)
+// Salotto (right) z6-12
+addFloorCeil(7,9,10,6,0);
+wallBox(2,7,0.3,3,1,0); wallBox(12,9,0.3,3,6,0); wallBox(7,6,10,3,0.3,0); wallBox(7,12,10,3,0.3,0);
+pointLight(7,9,0,0xffaa55,1);
+// Cucina (left) z14-20
+addFloorCeil(-7,17,10,6,0);
+wallBox(-2,17,0.3,3,1,0); wallBox(-12,17,0.3,3,6,0); wallBox(-7,14,10,3,0.3,0); wallBox(-7,20,10,3,0.3,0);
+pointLight(-7,17,0,0xffaa55,1);
+// Bagno (right) z22-26
+addFloorCeil(6,24,6,4,0);
+wallBox(2,24,0.3,3,2,0); wallBox(9,24,0.3,3,4,0); wallBox(6,22,6,3,0.3,0); wallBox(6,26,6,3,0.3,0);
+pointLight(6,24,0,0xffdd99,0.7);
+// Scantinato (basement, ly=-3) reached by walking down the west alcove (x -2 to -8, z1-5)
+addFloorCeil(-12,3,10,8,-3);
+wallBox(-8,0,0.3,3,7,-3); wallBox(-17,3,0.3,3,8,-3); wallBox(-12,-1,10,3,0.3,-3); wallBox(-12,7,10,3,0.3,-3);
+pointLight(-12,3,-3,0x5566aa,0.6);
+
+// stair up ground->first z26-32 (no rooms, straight)
+wallBox(-2,29,0.3,3,6,0); wallBox(2,29,0.3,3,6,0);
+
+// ===== FIRST FLOOR (ly=3) corridor z32-48 =====
+addFloorCeil(0,40,4,16,3);
+wallBox(-2,35,0.3,3,6,3); wallBox(-2,46,0.3,3,4,3);
+wallBox(2,35,0.3,3,6,3);  wallBox(2,46,0.3,3,4,3);
+pointLight(0,33,3,0xffaa55,0.9); pointLight(0,44,3,0xff8844,0.8);
+// Camera da letto (right) z34-40
+addFloorCeil(7,37,10,6,3);
+wallBox(2,36,0.3,3,1,3); wallBox(12,37,0.3,3,6,3); wallBox(7,34,10,3,0.3,3); wallBox(7,40,10,3,0.3,3);
+pointLight(7,37,3,0xffaa88,1);
+// Stanza del bambino (left) z42-48
+addFloorCeil(-7,45,10,6,3);
+wallBox(-2,44,0.3,3,1,3); wallBox(-12,45,0.3,3,6,3); wallBox(-7,42,10,3,0.3,3); wallBox(-7,48,10,3,0.3,3);
+pointLight(-7,45,3,0xffaa88,1);
+
+// stair up first->attic z48-54
+wallBox(-2,51,0.3,3,6,3); wallBox(2,51,0.3,3,6,3);
+
+// ===== ATTIC / SOFFITTA (ly=6) z54-62, locked door at z60 =====
+addFloorCeil(0,58,8,8,6);
+wallBox(-4,58,0.3,3,8,6); wallBox(4,58,0.3,3,8,6); wallBox(0,54,8,3,0.3,6);
+pointLight(0,58,6,0xffcc88,0.7);
+const lockedDoor=wallBox(0,60.3,4,3,0.3,6,'door');
+
+// ===== GRAVEYARD (beyond the door, ly=6) z62-76 =====
+addFloorCeil(0,69,12,14,6);
+wallBox(-6,69,0.3,3,14,6); wallBox(6,69,0.3,3,14,6); wallBox(0,76,12,3,0.3,6);
+pointLight(0,66,6,0x5577aa,0.35); pointLight(0,73,6,0x445588,0.3);
+const stoneMat=new THREE.MeshStandardMaterial({color:0x3a3a3a,roughness:1});
+for(let i=0;i<12;i++){
+  const s=new THREE.Mesh(new THREE.BoxGeometry(0.7,1.1+Math.random()*0.6,0.2),stoneMat);
+  s.position.set(-5+Math.random()*10, 6+0.6, 63+Math.random()*11);
+  s.rotation.y=Math.random()*0.4-0.2; scene.add(s);
+}
+
+// ===== NOTES (10) =====
+function noteMesh(col){ return new THREE.Mesh(new THREE.SphereGeometry(0.14,10,10),new THREE.MeshBasicMaterial({color:col||0xffdd88})); }
+const loreTexts=[
+ "\"Papà dice che qualcuno bussa alle pareti di notte. Io li sento contare... 1... 2... 3...\" — diario di una bambina Ravenscroft, 1897",
+ "\"Il maggiordomo non si è presentato da tre giorni. La sua stanza è chiusa dall'interno.\" — appunti del capofamiglia",
+ "\"Ho trovato segni di unghie sotto le assi della cantina. Verso l'alto.\" — lettera mai spedita",
+ "\"Non sono scomparsi. Sono ancora qui, sotto la nostra stessa terra.\" — pagina strappata da un diario",
+ "\"Elliot, se leggi questo: la porta in soffitta non va aperta. Ma so che la aprirai comunque.\" — nota di un detective precedente, mai più tornato"
+];
+const clueTexts=[
+ "\"La prima chiave giace dove il freddo scende sottoterra, tra la polvere della cantina.\"",
+ "\"La seconda chiave dorme sotto il velluto consumato di una vecchia poltrona, in salotto.\"",
+ "\"La terza chiave è nascosta dietro i fornelli anneriti dal tempo, in cucina.\"",
+ "\"La quarta chiave riposa sotto il materasso della camera da letto padronale.\"",
+ "\"La quinta chiave è cucita dentro un vecchio orsacchiotto, nella stanza del bambino.\""
+];
+const noteDefs=[
+ {p:[0,1.2,2],  t:loreTexts[0]},
+ {p:[0,1.2,9],  t:clueTexts[0], key:0},
+ {p:[-12,1.2,3],t:loreTexts[1]},
+ {p:[7,1.2,10], t:loreTexts[2]},
+ {p:[-7,1.2,18],t:clueTexts[1], key:1},
+ {p:[6,1.2,25], t:clueTexts[2], key:2},
+ {p:[0,4.65,33],t:loreTexts[3]},
+ {p:[-7,4.65,46],t:clueTexts[3], key:3},
+ {p:[7,4.65,38], t:clueTexts[4], key:4},
+ {p:[0,7.65,57],t:loreTexts[4]}
+];
+const notes=[]; let notesCollected=0;
+noteDefs.forEach((d,i)=>{ const n=noteMesh(); n.position.set(d.p[0],d.p[1],d.p[2]); n.userData=d; n.userData.i=i; scene.add(n); notes.push(n); });
+
+// ===== KEYS (5), hidden until their clue note is read =====
+const keyDefs=[
+ {p:[-12,1.0,6],ly:-3},   // scantinato
+ {p:[7,1.0,7],ly:0},      // salotto
+ {p:[-7,1.0,15],ly:0},    // cucina
+ {p:[7,4.0,35],ly:3},     // camera da letto
+ {p:[-7,4.0,47],ly:3}     // stanza del bambino
+];
+const keys=[]; let keysCollected=0;
+keyDefs.forEach((d,i)=>{
+  const k=new THREE.Mesh(new THREE.TorusGeometry(0.16,0.05,8,12),new THREE.MeshBasicMaterial({color:0xd4af37}));
+  k.position.set(d.p[0],d.p[1],d.p[2]); k.visible=false; k.userData.i=i; scene.add(k); keys.push(k);
+});
+
+// ===== ambient jumpscares =====
+const noises=["Un tonfo sordo, alle tue spalle.","Passi. Poi silenzio.","Qualcosa ha respirato vicino al tuo orecchio.","Un sussurro, in una lingua che non conosci.","Il pavimento scricchiola sopra di te... ma non c'è nessun piano sopra."];
+let scareTimer=600+Math.random()*900;
+function toast(msg,ms){ const t=document.getElementById('toast'); t.textContent=msg; t.style.opacity='1'; setTimeout(()=>t.style.opacity='0',ms||3000); }
+function ambientScare(){
+  const f=document.getElementById('flash');
+  f.style.opacity='0.55'; setTimeout(()=>f.style.opacity='0',90);
+  toast(noises[Math.floor(Math.random()*noises.length)],2800);
+  scareTimer=700+Math.random()*1200;
+}
+
+let started=false, ended=false, doorOpen=false, graveyardEndTriggered=false;
+let yaw=0,pitch=0; const keysDown={};
+addEventListener('keydown',e=>{ keysDown[e.key.toLowerCase()]=true; if(e.key.toLowerCase()==='f'&&started){ flOn=!flOn; flashlight.intensity=flOn?2.2:0; document.getElementById('fState').textContent=flOn?'accesa':'spenta'; }});
+addEventListener('keyup',e=>keysDown[e.key.toLowerCase()]=false);
+cv.addEventListener('click',()=>{ if(started) cv.requestPointerLock(); });
+document.addEventListener('mousemove',e=>{
+  if(document.pointerLockElement!==cv) return;
+  yaw-=e.movementX*0.0022; pitch-=e.movementY*0.0022; pitch=Math.max(-1.3,Math.min(1.3,pitch));
+});
+
+function collide(nx,nz,r){
+  for(const w of walls){
+    if(w.id==='door' && doorOpen) continue;
+    if(nx+r>w.minX&&nx-r<w.maxX&&nz+r>w.minZ&&nz-r<w.maxZ) return w;
+  }
+  return null;
+}
+function floorY(x,z){
+  if(z>=1&&z<=5&&x<=-2){ const t=Math.max(0,Math.min(1,(-2-x)/6)); return -3*t; }
+  if(z<26) return 0;
+  if(z<=32){ const t=Math.max(0,Math.min(1,(z-26)/6)); return 3*t; }
+  if(z<48) return 3;
+  if(z<=54){ const t=Math.max(0,Math.min(1,(z-48)/6)); return 3+3*t; }
+  return 6;
+}
+
+function showNote(d){
+  document.getElementById('noteText').textContent=d.t;
+  document.getElementById('notePopup').classList.remove('hidden');
+  document.exitPointerLock();
+  setTimeout(()=>{ document.getElementById('notePopup').classList.add('hidden'); },4200);
+  if(d.key!==undefined){ keys[d.key].visible=true; }
+}
+
+function endGame(){
+  ended=true; started=false; document.exitPointerLock();
+  document.getElementById('endScreen').classList.remove('hidden');
+  document.getElementById('endTitle').textContent='NIENTE È PER SEMPRE';
+  document.getElementById('endText').textContent='Dopo questo del detective non si ebbero più notizie… ma una cosa è certa… quella casa, nasconde qualcosa…';
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  flickers.forEach(l=>{ l.intensity=(l.userData.base||(l.userData.base=l.intensity))*(0.7+Math.random()*0.55); });
+  if(!started||ended){ renderer.render(scene,camera); return; }
+
+  camera.rotation.order='YXZ'; camera.rotation.y=yaw; camera.rotation.x=pitch;
+
+  let mx=0,mz=0;
+  if(keysDown['w']||keysDown['arrowup']) mz-=1;
+  if(keysDown['s']||keysDown['arrowdown']) mz+=1;
+  if(keysDown['a']||keysDown['arrowleft']) mx-=1;
+  if(keysDown['d']||keysDown['arrowright']) mx+=1;
+  if(mx||mz){
+    const len=Math.hypot(mx,mz); mx/=len; mz/=len;
+    const speed=0.058, r=0.32;
+    const dx=(mx*Math.cos(yaw)+mz*Math.sin(yaw))*speed;
+    const dz=(mz*Math.cos(yaw)-mx*Math.sin(yaw))*speed;
+    const hitX=collide(camera.position.x+dx,camera.position.z,r);
+    if(!hitX) camera.position.x+=dx; else if(hitX.id==='door') toast('La porta è sigillata. Servono le 5 chiavi ('+keysCollected+'/5).',2500);
+    const hitZ=collide(camera.position.x,camera.position.z+dz,r);
+    if(!hitZ) camera.position.z+=dz; else if(hitZ.id==='door') toast('La porta è sigillata. Servono le 5 chiavi ('+keysCollected+'/5).',2500);
+  }
+  camera.position.y=floorY(camera.position.x,camera.position.z)+1.65;
+
+  for(const n of notes){
+    if(!n.visible) continue;
+    n.rotation.y+=0.03;
+    if(camera.position.distanceTo(n.position)<1.4){
+      n.visible=false; notesCollected++; document.getElementById('noteCount').textContent=notesCollected;
+      showNote(n.userData);
+    }
+  }
+  for(const k of keys){
+    if(!k.visible) continue;
+    k.rotation.z+=0.04;
+    if(camera.position.distanceTo(k.position)<1.3){
+      k.visible=false; keysCollected++; document.getElementById('keyCount').textContent=keysCollected;
+      toast('Hai raccolto una chiave. ('+keysCollected+'/5)',2500);
+      if(keysCollected>=5 && !doorOpen){ doorOpen=true; toast('Le cinque chiavi hanno sbloccato la porta della soffitta...',3500); }
+    }
+  }
+
+  scareTimer--; if(scareTimer<=0) ambientScare();
+
+  if(doorOpen && camera.position.z>66 && !graveyardEndTriggered){
+    graveyardEndTriggered=true;
+    toast('Un cimitero. Sono tutti qui, sotto la casa. Questa è la verità.',4000);
+    setTimeout(()=>{
+      const f=document.getElementById('flash');
+      f.style.opacity='1'; setTimeout(()=>f.style.opacity='0',200);
+      endGame();
+    },4500);
+  }
+
+  renderer.render(scene,camera);
+}
+animate();
+
+document.getElementById('btnStart').onclick=()=>{
+  document.getElementById('startScreen').classList.add('hidden');
+  started=true; ended=false; notesCollected=0; keysCollected=0; doorOpen=false; graveyardEndTriggered=false;
+  document.getElementById('noteCount').textContent='0'; document.getElementById('keyCount').textContent='0';
+  flOn=false; flashlight.intensity=0; document.getElementById('fState').textContent='spenta';
+  notes.forEach(n=>n.visible=true); keys.forEach(k=>k.visible=false);
+  camera.position.set(0,1.65,0); yaw=0; pitch=0;
+  cv.requestPointerLock();
+};
+document.getElementById('btnRestart').onclick=()=>{
+  document.getElementById('endScreen').classList.add('hidden');
+  document.getElementById('startScreen').classList.remove('hidden');
+};
+})();
+</script>
+</body>
+</html>
