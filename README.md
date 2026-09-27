@@ -9,10 +9,20 @@ Horror in prima persona, giocabile interamente nel browser (Three.js, un unico f
 
 ## Come si gioca
 
+Prima di iniziare, il gioco chiede se stai giocando da **PC** o da **telefono/tablet**.
+
+**Da PC:**
 - **WASD** — movimento
 - **Mouse** — guarda intorno (click sul gioco per attivare il puntatore)
 - **F** — accendi/spegni la torcia
-- Esplora la casa su due piani, più scantinato e soffitta
+
+**Da telefono/tablet:**
+- **Joystick virtuale** (in basso a sinistra) — movimento
+- **Trascina il dito** (metà destra dello schermo) — guarda intorno
+- **Pulsante 🔦** (in basso a destra) — accendi/spegni la torcia
+- Si gioca in **orizzontale**: se il dispositivo è in verticale, il gioco mostra un avviso e si mette in pausa finché non lo ruoti
+
+In entrambi i casi: esplora la casa su due piani, più scantinato e soffitta
 - Trova **10 appunti**: 5 raccontano la storia, 5 nascondono indizi per trovare le **5 chiavi**
 - Con tutte le chiavi, la porta sigillata in soffitta si apre... e dietro c'è la verità
 
